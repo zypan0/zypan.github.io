@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+    <head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport" />
+    <link rel="alternate icon" type="image/png" href="/zypan.github.io/img/favicon.png">
+    <title>zy Notes | </title>
+    
+<link rel="stylesheet" href="/zypan.github.io/css/reset.css">
+
+    
+<link rel="stylesheet" href="/zypan.github.io/css/style.css">
+
+    
+<link rel="stylesheet" href="/zypan.github.io/css/markdown.css">
+
+    
+<link rel="stylesheet" href="/zypan.github.io/css/fonts.css">
+
+<meta name="generator" content="Hexo 7.0.0"></head>
+    <body>
+        <div class="paper">
+            <div class="paper-main">
+                
+                    <div class="post-header">
+    <a class="logo" href="/zypan.github.io/">zy Notes</a>
+    <a class="go-home" href="/zypan.github.io/">
+        <svg width="8" height="14" viewBox="0 0 8 14">
+            <path d="M7 1L1 7l6 6" stroke="#000" stroke-width="2" fill="none" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </a>
+</div>
+                
+                <div class="post-main">
+
+    
+    
+        <div class="post-main-title">
+            autogen源码breakdown
+        </div>
+        <div class="post-meta">
+            2024-01-03
+        </div>
+        <div class="post-md">
+            <p>(WIP) This is a Note post to breakdown some of the source code of autogen(<a target="_blank" rel="noopener" href="https://github.com/microsoft/autogen">https://github.com/microsoft/autogen</a>), the multi-agent framework by Microsoft</p>
+<h2 id="TLDR"><a href="#TLDR" class="headerlink" title="TLDR"></a>TLDR</h2><p>基本类</p>
+<blockquote>
+<ul>
+<li><code>Agent</code></li>
+<li><code>ConversableAgent</code></li>
+<li><code>GroupChat</code> and <code>GroupChatManager</code></li>
+</ul>
+</blockquote>
+<hr>
+<h2 id="class-Agent"><a href="#class-Agent" class="headerlink" title="class Agent"></a>class <code>Agent</code></h2><p>The very basic agent class, including following basic functions:</p>
+<blockquote>
+<ul>
+<li><code>send</code>: send message to another agent</li>
+<li><code>receive</code>: receive message from another agent</li>
+<li><code>generate_reply</code>: 请求llm生成回答</li>
+</ul>
+</blockquote>
+<hr>
+<h2 id="class-ConversableAgent"><a href="#class-ConversableAgent" class="headerlink" title="class ConversableAgent"></a>class <code>ConversableAgent</code></h2><p>基本的对话agent，是最基础的 <code>Agent</code> class的最基础实现</p>
+<h3 id="a-register-reply"><a href="#a-register-reply" class="headerlink" title="a. register_reply"></a>a. <code>register_reply</code></h3><p>用来注册reply function，当trigger满足时，调用reply_function</p>
+<p>用来控制agent之间的对话，如什么时候停止</p>
+<p>几种基本的注册函数：</p>
+<ul>
+<li>check_termination_and_human_reply</li>
+<li>function calling</li>
+<li>oai_reply</li>
+</ul>
+<h3 id="b-reply-function"><a href="#b-reply-function" class="headerlink" title="b. reply_function"></a>b. <code>reply_function</code></h3><p>输入sender, recipient, message 输出一个reply</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">reply_func</span>(<span class="params"></span></span><br><span class="line"><span class="params">    recipient: ConversableAgent,</span></span><br><span class="line"><span class="params">    messages: <span class="type">Optional</span>[<span class="type">List</span>[<span class="type">Dict</span>]] = <span class="literal">None</span>,</span></span><br><span class="line"><span class="params">    sender: <span class="type">Optional</span>[Agent] = <span class="literal">None</span>,</span></span><br><span class="line"><span class="params">    config: <span class="type">Optional</span>[<span class="type">Any</span>] = <span class="literal">None</span>,</span></span><br><span class="line"><span class="params"></span>) -&gt; <span class="type">Tuple</span>[<span class="built_in">bool</span>, <span class="type">Union</span>[<span class="built_in">str</span>, <span class="type">Dict</span>, <span class="literal">None</span>]]:</span><br></pre></td></tr></table></figure>
+
+<p><code>trigger</code>: 任意形式的Agent或者List[Agent]</p>
+<p>eg.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">generate_oai_reply</span>(<span class="params"></span></span><br><span class="line"><span class="params">    self,</span></span><br><span class="line"><span class="params">    messages: <span class="type">Optional</span>[<span class="type">List</span>[<span class="type">Dict</span>]] = <span class="literal">None</span>,</span></span><br><span class="line"><span class="params">    sender: <span class="type">Optional</span>[Agent] = <span class="literal">None</span>,</span></span><br><span class="line"><span class="params">    config: <span class="type">Optional</span>[OpenAIWrapper] = <span class="literal">None</span>,</span></span><br><span class="line"><span class="params"></span>) -&gt; <span class="type">Tuple</span>[<span class="built_in">bool</span>, <span class="type">Union</span>[<span class="built_in">str</span>, <span class="type">Dict</span>, <span class="literal">None</span>]]:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;Generate a reply using autogen.oai.&quot;&quot;&quot;</span></span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">True</span>, extracted_response</span><br></pre></td></tr></table></figure>
+
+<h3 id="c-check-termination-and-human-reply"><a href="#c-check-termination-and-human-reply" class="headerlink" title="c. check_termination_and_human_reply"></a>c. <code>check_termination_and_human_reply</code></h3><p>检查对话是否应该被结束</p>
+<hr>
+<h2 id="User-proxy"><a href="#User-proxy" class="headerlink" title="User_proxy"></a>User_proxy</h2><p>代表user的agent</p>
+<p>conversable agent把human input设置为always</p>
+<hr>
+<h2 id="GroupChat"><a href="#GroupChat" class="headerlink" title="GroupChat"></a>GroupChat</h2><p>包含 dataclass <code>GroupChat</code> 和 conversable agent <code>GroupChatManager</code></p>
+<h3 id="GroupChat-1"><a href="#GroupChat-1" class="headerlink" title="GroupChat"></a><code>GroupChat</code></h3><ul>
+<li>保存群聊配置：agents, messages, speaker_selection_method…</li>
+<li>next_agent方法</li>
+</ul>
+<h3 id="GroupChatManager"><a href="#GroupChatManager" class="headerlink" title="GroupChatManager"></a><code>GroupChatManager</code></h3><ul>
+<li>真正执行groupchat的对话agent</li>
+<li>使用<code>register_reply</code> 注册 <code>run_chat</code> 函数组织群聊对话</li>
+<li>不断选择next_agent, 并 send 信息</li>
+</ul>
+
+        </div>
+
+    
+
+</div>
+                <div class="footer">
+    <span>Copyright © 2022 zy Notes</span>
+    <span>Theme Designed By <a target="_blank" href="https://zheli.design/one-paper">這李設計</a></span>
+</div>
+
+
+<link rel="stylesheet" href="/zypan.github.io/css/a11y-dark.min.css">
+
+
+<script src="/zypan.github.io/js/highlight.min.js"></script>
+
+
+<script src="/zypan.github.io/js/highlightjs-line-numbers.js"></script>
+
+
+<script>
+    hljs.initHighlightingOnLoad();
+    hljs.initLineNumbersOnLoad();
+</script>
+
+            </div>
+        </div>
+    </body>
+</html>
